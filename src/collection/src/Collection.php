@@ -89,11 +89,12 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
      */
     public function median($key = null)
     {
-        $values = (isset($key) ? $this->pluck($key) : $this)->filter(function ($item) {
-            return ! is_null($item);
-        })->sort()->values();
+        $values = (isset($key) ? $this->pluck($key) : $this)
+            ->filter(fn ($item) => ! is_null($item))
+            ->sort()
+            ->values();
         $count = $values->count();
-        if ($count == 0) {
+        if ($count === 0) {
             return null;
         }
         $middle = (int) ($count / 2);
@@ -125,14 +126,10 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
          * @var static<TValue, int> $counts
          */
         $counts = new self();
-        $collection->each(function ($value) use ($counts) {
-            $counts[$value] = isset($counts[$value]) ? $counts[$value] + 1 : 1;
-        });
-        $sorted = $counts->sort();
-        $highestValue = $sorted->last();
-        return $sorted->filter(function ($value) use ($highestValue) {
-            return $value == $highestValue;
-        })->sort()->keys()->all();
+        $collection->each(fn ($value) => $counts[$value] = ($counts[$value] ?? 0) + 1);
+        $highestValue = $counts->max();
+
+        return $counts->filter(fn ($value) => $value === $highestValue)->sort()->keys()->all();
     }
 
     /**
@@ -483,10 +480,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
         $results = [];
         foreach ($this->items as $key => $item) {
             $resolvedKey = $keyBy($item, $key);
-            if (is_object($resolvedKey)) {
-                $resolvedKey = (string) $resolvedKey;
-            }
-            $results[$resolvedKey] = $item;
+            $results[(string) $resolvedKey] = $item;
         }
         return new static($results);
     }
@@ -1014,18 +1008,16 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
      */
     public function split(int $numberOfGroups): static
     {
-        if ($this->isEmpty()) {
+        if ($this->isEmpty() || $numberOfGroups <= 0) {
             return new static();
         }
         $groups = new static();
-        $groupSize = (int) floor($this->count() / $numberOfGroups);
-        $remain = $this->count() % $numberOfGroups;
+        $totalItems = $this->count();
+        $groupSize = (int) floor($totalItems / $numberOfGroups);
+        $remain = $totalItems % $numberOfGroups;
         $start = 0;
         for ($i = 0; $i < $numberOfGroups; ++$i) {
-            $size = $groupSize;
-            if ($i < $remain) {
-                ++$size;
-            }
+            $size = $groupSize + ($i < $remain ? 1 : 0);
             if ($size) {
                 $groups->push(new static(array_slice($this->items, $start, $size)));
                 $start += $size;
